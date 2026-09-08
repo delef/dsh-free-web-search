@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { SettingsConflictError, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
 import { FREE_SEARCH_NS } from '../constants.js'
 import type { SearchResult, TimeRange } from '../engines/index.js'
 
@@ -18,7 +18,7 @@ interface SettingsDescriptor {
 
 interface SettingsService {
   describe(opts: { redactSecrets: boolean }): SettingsDescriptor[]
-  mutate(ns: ReturnType<typeof settingsNamespace>, ops: unknown[], expectedRevision?: number): Promise<void>
+  mutate(ns: string, ops: unknown[], expectedRevision?: number): Promise<void>
   writable?: boolean
 }
 
@@ -144,7 +144,7 @@ export function makeBridgeRoutes(
       }
       const expectedRevision = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined
       try {
-        await settings.mutate(settingsNamespace(ns), body.ops as unknown[], expectedRevision)
+        await settings.mutate(ns, body.ops as unknown[], expectedRevision)
       } catch (error) {
         if (error instanceof SettingsConflictError) {
           return { ok: false, code: 'settings-conflict', message: error.message }

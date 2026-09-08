@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   searchDdgHtml,
@@ -304,9 +304,11 @@ export function apply(ctx: Context, config?: PluginConfig) {
     }
   }
 
-  installSettingsSection(ctx, FREE_SEARCH_NS, Config, (config ?? {}) as any, {
-    setSource: (source: () => PluginConfig) => { current = source },
-    onChange: () => { if (refreshPrompt) refreshPrompt() },
+  ctx.inject(['settings'], (settingsCtx: Context) => {
+    settingsCtx.settings.installSection(ctx, FREE_SEARCH_NS, Config, (config ?? {}) as any, {
+      setSource: (source: () => PluginConfig) => { current = source },
+      onChange: () => { if (refreshPrompt) refreshPrompt() },
+    })
   })
 
   ctx.inject(['webServer', 'settings'], (sctx: Context) => {

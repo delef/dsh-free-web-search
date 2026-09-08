@@ -1,6 +1,4 @@
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-
-export const FREE_SEARCH_NS = settingsNamespace('free-search')
+export const FREE_SEARCH_NS = 'free-search'
 
 export const ALL_ENGINES = [
   'ddg', 'ddg-lite', 'bing', 'searxng', 'anysearch',
