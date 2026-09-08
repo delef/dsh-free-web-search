@@ -5,13 +5,13 @@ import { FreeSearchCard, ENGINES, bridgeDescribe, bridgeMutate, NS } from './Fre
 export const inject = ['slots', 'commandUi'] as const
 
 export function apply(ctx: Context) {
+  // The configurable-plugins tab dispatches one slot key per served namespace,
+  // so the card's key must be the settings namespace it edits.
   ctx.slots.inject('settings.plugin.item', () =>
     ctx.slots.register(
       {
         name: 'settings.plugin.item',
-        key: 'free-web-search',
-        id: 'dsh-free-web-search',
-        order: 120,
+        key: NS,
         inject: () => ({}),
       },
       FreeSearchCard,

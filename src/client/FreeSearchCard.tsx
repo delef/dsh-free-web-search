@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
+// The namespace join key with the Host half; keep the two halves on one constant.
+import { FREE_SEARCH_NS as NS } from '../constants.js'
 
 const BRIDGE_PREFIX = '/api/dsh-free-web-search-settings'
-const NS = 'free-search'
 
 const CSS = [
   '.dshfs-card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;min-width:0;list-style:none;transition:border-color .16s,background .16s;overflow:hidden;margin-bottom:8px}',
