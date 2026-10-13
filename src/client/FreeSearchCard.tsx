@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 
 const BRIDGE_PREFIX = '/api/dsh-free-web-search-settings'
-const NS = 'free-search'
+// Settings ns = the profile entry id inserted by cordis.patch.yml.
+const NS = 'web-search-free'
 
 const CSS = [
   '.dshfs-card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;min-width:0;list-style:none;transition:border-color .16s,background .16s;overflow:hidden;margin-bottom:8px}',

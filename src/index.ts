@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   searchDdgHtml,
@@ -52,20 +51,32 @@ interface PluginConfig {
 }
 
 export const Config = z.object({
-  provider: z.string().default('bing'),
-  cache: z.boolean().default(true),
-  cacheTtl: z.number().default(5),
-  lang: z.string().default('en'),
-  region: z.string(),
-  bingMarket: z.string().default('en-US'),
-  searxngInstances: z.array(z.string()),
-  platforms: z.array(z.string()).default(['github', 'reddit']),
-  exaApiKey: z.string().role('secret'),
-  tavilyApiKey: z.string().role('secret'),
-  keenableApiKey: z.string().role('secret'),
-  perplexityApiKey: z.string().role('secret'),
-  deepseekApiKey: z.string().role('secret'),
+  provider: z.string().default('bing').volatile(),
+  cache: z.boolean().default(true).volatile(),
+  cacheTtl: z.number().default(5).volatile(),
+  lang: z.string().default('en').volatile(),
+  region: z.string().volatile(),
+  bingMarket: z.string().default('en-US').volatile(),
+  searxngInstances: z.array(z.string()).volatile(),
+  platforms: z.array(z.string()).default(['github', 'reddit']).volatile(),
+  exaApiKey: z.string().role('secret').volatile(),
+  tavilyApiKey: z.string().role('secret').volatile(),
+  keenableApiKey: z.string().role('secret').volatile(),
+  perplexityApiKey: z.string().role('secret').volatile(),
+  deepseekApiKey: z.string().role('secret').volatile(),
 })
+
+/** dsh-settings ≥0.2 resolves volatile fields as live refs; dereference on every read. */
+function readConfig(cfg: unknown): PluginConfig {
+  if (cfg === null || typeof cfg !== 'object') return {}
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(cfg as Record<string, unknown>)) {
+    out[key] = value !== null && typeof value === 'object' && typeof (value as { get?: unknown }).get === 'function'
+      ? (value as { get: () => unknown }).get()
+      : value
+  }
+  return out as PluginConfig
+}
 
 function toSearchOptions(cfg: PluginConfig, timeRange?: TimeRange): SearchOptions {
   return {
@@ -77,7 +88,7 @@ function toSearchOptions(cfg: PluginConfig, timeRange?: TimeRange): SearchOption
 }
 
 export function apply(ctx: Context, config?: PluginConfig) {
-  let current = (): PluginConfig => config ?? {}
+  let current = (): PluginConfig => readConfig(config)
   // Context services not covered by @deepseek-ai/cordis types
   const ctxAny = ctx as any // eslint-disable-line @typescript-eslint/no-explicit-any
   const logger = ctxAny.logger as { warn(msg: string): void }
@@ -304,10 +315,10 @@ export function apply(ctx: Context, config?: PluginConfig) {
     }
   }
 
-  installSettingsSection(ctx, FREE_SEARCH_NS, Config, (config ?? {}) as any, {
-    setSource: (source: () => PluginConfig) => { current = source },
-    onChange: () => { if (refreshPrompt) refreshPrompt() },
-  })
+  // dsh-settings ≥0.2: the settings form is auto-generated from this entry's
+  // Config schema (all fields volatile); live edits commit in place and emit
+  // loader/volatile-update instead of remounting the plugin.
+  ctxAny.on?.('loader/volatile-update', () => { refreshPrompt?.() })
 
   ctx.inject(['webServer', 'settings'], (sctx: Context) => {
     sctx.effect(() => {

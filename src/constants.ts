@@ -1,6 +1,6 @@
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-
-export const FREE_SEARCH_NS = settingsNamespace('free-search')
+// dsh-settings ≥0.2 removed settingsNamespace(); settings are now keyed by the
+// profile entry id, which the shipped cordis.patch.yml inserts as "web-search-free".
+export const FREE_SEARCH_NS = 'web-search-free'
 
 export const ALL_ENGINES = [
   'ddg', 'ddg-lite', 'bing', 'searxng', 'anysearch',
