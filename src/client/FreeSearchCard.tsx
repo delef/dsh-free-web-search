@@ -1,7 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 
 const BRIDGE_PREFIX = '/api/dsh-free-web-search-settings'
-const NS = 'free-search'
+// Settings ns = the profile entry id inserted by cordis.patch.yml.
+const NS = 'free-web-search'
+// Entry id used before the rename; kept as a fallback for existing profiles.
+const LEGACY_NS = 'web-search-free'
+
+function findView<T extends { ns: string }>(namespaces: readonly T[]): T | undefined {
+  return namespaces.find(n => n.ns === NS) ?? namespaces.find(n => n.ns === LEGACY_NS)
+}
 
 const CSS = [
   '.dshfs-card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;min-width:0;list-style:none;transition:border-color .16s,background .16s;overflow:hidden;margin-bottom:8px}',
@@ -15,6 +22,7 @@ const CSS = [
   '.dshfs-chevron{color:var(--dsw-alias-label-tertiary);flex:none;font-size:13px;transition:transform .12s}',
   '.dshfs-chevronOpen{transform:rotate(180deg)}',
   '.dshfs-body{flex-direction:column;gap:14px;padding:0 14px 14px;display:flex}',
+  '.dshfs-legacy{color:var(--dsw-alias-state-warn-primary);font-size:12px;line-height:18px}',
   '.dshfs-footer{justify-content:space-between;align-items:center;gap:8px;display:flex;flex-wrap:wrap}',
   '.dshfs-footerLeft{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}',
   '.dshfs-footerRight{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
@@ -115,6 +123,7 @@ const I18N = {
   zh: {
     description: '免费搜索 —— 无需 API key（Bing / DuckDuckGo / AnySearch / Exa / Tavily / Keenable）',
     unsaved: '未保存',
+    legacyNotice: `配置项 id「${LEGACY_NS}」已弃用，请在 profile 中改名为「${NS}」。`,
     searchEngine: '搜索引擎',
     visit: '访问官网 →',
     getKey: '获取 API Key →',
@@ -145,6 +154,7 @@ const I18N = {
   en: {
     description: 'Free web search — no API key needed (Bing / DuckDuckGo / AnySearch / Exa / Tavily / Keenable)',
     unsaved: 'unsaved',
+    legacyNotice: `The profile entry id "${LEGACY_NS}" is deprecated. Rename it to "${NS}" in your profile.`,
     searchEngine: 'Search engine',
     visit: 'Visit website →',
     getKey: 'Get API Key →',
@@ -217,6 +227,7 @@ type CardStatus = 'loading' | 'ready' | 'unavailable'
 
 export function FreeSearchCard() {
   const [open, setOpen] = useState(false)
+  const [ns, setNs] = useState(NS)
   const [status, setStatus] = useState<CardStatus>('loading')
   const [writable, setWritable] = useState(false)
   const [provider, setProvider] = useState('bing')
@@ -242,11 +253,12 @@ export function FreeSearchCard() {
         setStatus('unavailable')
         return
       }
-      const view = result.value.namespaces.find(n => n.ns === NS)
+      const view = findView(result.value.namespaces)
       if (!view) {
         setStatus('unavailable')
         return
       }
+      setNs(view.ns)
       const v = (view.value ?? {}) as Record<string, unknown>
       setProvider((v.provider as string) ?? 'bing')
       setLang((v.lang as string) === 'zh' ? 'zh' : 'en')
@@ -309,7 +321,7 @@ export function FreeSearchCard() {
       if (deepseekKey.trim()) ops.push({ op: 'set', path: ['deepseekApiKey'], value: deepseekKey.trim() })
       ops.push({ op: 'set', path: ['platforms'], value: platforms })
       ops.push({ op: 'set', path: ['cacheTtl'], value: Math.min(Math.max(Number(cacheTtl) || 5, 0), 5) })
-      const result = await bridgeMutate({ ns: NS, ops })
+      const result = await bridgeMutate({ ns, ops })
       if (result.ok) {
         setDirty(false)
         setFailed(false)
@@ -392,6 +404,7 @@ export function FreeSearchCard() {
 
       {open ? (
         <div className="dshfs-body">
+          {ns === LEGACY_NS ? <div className="dshfs-legacy" role="alert">{t.legacyNotice}</div> : null}
           <div className="dshfs-field">
             <div className="dshfs-label">
               {t.searchEngine}
@@ -560,4 +573,13 @@ export function FreeSearchCard() {
   )
 }
 
-export { ENGINES, bridgeDescribe, bridgeMutate, NS, BRIDGE_PREFIX }
+/** Plugins-section tab body: the card is an `<li>`, so give it a list parent. */
+export function FreeSearchTab() {
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', maxWidth: 760 }}>
+      <FreeSearchCard />
+    </ul>
+  )
+}
+
+export { ENGINES, bridgeDescribe, bridgeMutate, findView, NS, BRIDGE_PREFIX }

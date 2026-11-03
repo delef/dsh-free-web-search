@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   searchDdgHtml,
@@ -25,14 +24,14 @@ import { createAdvancedSearchTool } from './tools/web-search.js'
 import { createPlatformSearchTool } from './tools/platform-search.js'
 import { createEngineTestTool } from './tools/engine-test.js'
 import { createWebFetchTool } from './tools/web-fetch.js'
-import { FREE_SEARCH_NS, ALL_ENGINES } from './constants.js'
+import { FREE_SEARCH_NS, LEGACY_FREE_SEARCH_NS, ALL_ENGINES } from './constants.js'
 import type { EngineId, EngineTestFn, EngineTestResult, EngineTestFailure } from './constants.js'
 
 export { parseTimeRange, approximateTimeRange }
 export { FREE_SEARCH_NS, ALL_ENGINES, FREE_ENGINES } from './constants.js'
 export type { EngineId, EngineTestFn } from './constants.js'
 
-export const name = 'web-search-free'
+export const name = 'free-web-search'
 export const inject = ['web']
 
 interface PluginConfig {
@@ -52,20 +51,32 @@ interface PluginConfig {
 }
 
 export const Config = z.object({
-  provider: z.string().default('bing'),
-  cache: z.boolean().default(true),
-  cacheTtl: z.number().default(5),
-  lang: z.string().default('en'),
-  region: z.string(),
-  bingMarket: z.string().default('en-US'),
-  searxngInstances: z.array(z.string()),
-  platforms: z.array(z.string()).default(['github', 'reddit']),
-  exaApiKey: z.string().role('secret'),
-  tavilyApiKey: z.string().role('secret'),
-  keenableApiKey: z.string().role('secret'),
-  perplexityApiKey: z.string().role('secret'),
-  deepseekApiKey: z.string().role('secret'),
+  provider: z.string().default('bing').volatile(),
+  cache: z.boolean().default(true).volatile(),
+  cacheTtl: z.number().default(5).volatile(),
+  lang: z.string().default('en').volatile(),
+  region: z.string().volatile(),
+  bingMarket: z.string().default('en-US').volatile(),
+  searxngInstances: z.array(z.string()).volatile(),
+  platforms: z.array(z.string()).default(['github', 'reddit']).volatile(),
+  exaApiKey: z.string().role('secret').volatile(),
+  tavilyApiKey: z.string().role('secret').volatile(),
+  keenableApiKey: z.string().role('secret').volatile(),
+  perplexityApiKey: z.string().role('secret').volatile(),
+  deepseekApiKey: z.string().role('secret').volatile(),
 })
+
+/** dsh-settings ≥0.2 resolves volatile fields as live refs; dereference on every read. */
+function readConfig(cfg: unknown): PluginConfig {
+  if (cfg === null || typeof cfg !== 'object') return {}
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(cfg as Record<string, unknown>)) {
+    out[key] = value !== null && typeof value === 'object' && typeof (value as { get?: unknown }).get === 'function'
+      ? (value as { get: () => unknown }).get()
+      : value
+  }
+  return out as PluginConfig
+}
 
 function toSearchOptions(cfg: PluginConfig, timeRange?: TimeRange): SearchOptions {
   return {
@@ -77,12 +88,22 @@ function toSearchOptions(cfg: PluginConfig, timeRange?: TimeRange): SearchOption
 }
 
 export function apply(ctx: Context, config?: PluginConfig) {
-  let current = (): PluginConfig => config ?? {}
+  let current = (): PluginConfig => readConfig(config)
   // Context services not covered by @deepseek-ai/cordis types
   const ctxAny = ctx as any // eslint-disable-line @typescript-eslint/no-explicit-any
   const logger = ctxAny.logger as { warn(msg: string): void }
   const credentials = ctxAny.get?.('credentials') as
     { resolve(name: string): Promise<{ value?: string }> } | null
+
+  // Profiles created before the entry id rename still work (the settings bridge
+  // accepts the legacy id), but they should move to the new id.
+  if ((ctxAny.fiber?.entry?.id as string | undefined) === LEGACY_FREE_SEARCH_NS) {
+    logger.warn(
+      `dsh-free-web-search: the profile entry id "${LEGACY_FREE_SEARCH_NS}" is deprecated; ` +
+      `rename it to "${FREE_SEARCH_NS}" (the id in cordis.patch.yml). ` +
+      `Settings saved under the old id are kept only until you rename the entry.`,
+    )
+  }
 
   let refreshPrompt: (() => void) | null = null
 
@@ -304,9 +325,18 @@ export function apply(ctx: Context, config?: PluginConfig) {
     }
   }
 
-  installSettingsSection(ctx, FREE_SEARCH_NS, Config, (config ?? {}) as any, {
-    setSource: (source: () => PluginConfig) => { current = source },
-    onChange: () => { if (refreshPrompt) refreshPrompt() },
+  // dsh-settings ≥0.2: the settings form is auto-generated from this entry's
+  // Config schema (all fields volatile); live edits commit in place and emit
+  // loader/volatile-update instead of remounting the plugin.
+  ctxAny.on?.('loader/volatile-update', () => { refreshPrompt?.() })
+
+  // The plugin ships its own settings card, so tell Settings not to offer an
+  // auto-generated page for this entry.
+  ctx.inject(['settings'], (sctx: Context) => {
+    sctx.effect(
+      () => (sctx as any).settings.configure({ auto: false }, ctxAny.fiber),
+      'free-search: custom settings page',
+    )
   })
 
   ctx.inject(['webServer', 'settings'], (sctx: Context) => {
