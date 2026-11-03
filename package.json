@@ -1,6 +1,6 @@
 {
   "name": "dsh-free-web-search",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Free web search for DeepSeek Harness: Bing, DuckDuckGo, SearXNG, Exa, Tavily, Keenable — with automatic fallback, time filtering, and platform search",
   "license": "Apache-2.0",
   "author": "delef",
