@@ -1,5 +1,5 @@
 - insert:
-    - id: web-search-free
+    - id: free-web-search
       name: dsh-free-web-search
       config:
         provider: bing

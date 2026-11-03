@@ -73,26 +73,32 @@ Tests engine availability. No arguments tests all engines.
 
 ## Configuration
 
-Settings are managed through the web UI (Settings > Plugins > Free Web Search) or `settings.yaml`:
+Settings are managed through the web UI (Settings > Plugins > Free Web Search) or in the `free-web-search` entry of the active profile (DSH 0.2+; earlier releases used the `free-search` section of `settings.yaml`):
 
 ```yaml
-free-search:
-  provider: bing
-  bingMarket: en-US
-  cache: true
-  cacheTtl: 5
-  platforms:
-    - github
-    - reddit
-  searxngInstances:          # optional, overrides default public instances
-    - https://your-instance.example.com
-  # Optional API keys
-  exaApiKey: ""
-  tavilyApiKey: ""
-  keenableApiKey: ""
-  perplexityApiKey: ""
-  deepseekApiKey: ""
+- id: free-web-search
+  name: dsh-free-web-search
+  config:
+    provider: bing
+    bingMarket: en-US
+    cache: true
+    cacheTtl: 5
+    platforms:
+      - github
+      - reddit
+    searxngInstances:        # optional, overrides default public instances
+      - https://your-instance.example.com
+    # Optional API keys
+    exaApiKey: ""
+    tavilyApiKey: ""
+    keenableApiKey: ""
+    perplexityApiKey: ""
+    deepseekApiKey: ""
 ```
+
+Profiles that still use the old entry id `web-search-free` keep working, but the plugin logs a deprecation warning and the settings card shows a notice. Rename the entry to `free-web-search` to migrate.
+
+Requires DSH `>=0.2.0-rc.2` (developed against `0.2.1-rc.5`).
 
 ## License
 

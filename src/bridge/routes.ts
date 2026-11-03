@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { SettingsConflictError, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { FREE_SEARCH_NS } from '../constants.js'
+import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
+import { FREE_SEARCH_NAMESPACES } from '../constants.js'
 import type { SearchResult, TimeRange } from '../engines/index.js'
 
 export const BRIDGE_PREFIX = '/api/dsh-free-web-search-settings'
@@ -18,7 +18,7 @@ interface SettingsDescriptor {
 
 interface SettingsService {
   describe(opts: { redactSecrets: boolean }): SettingsDescriptor[]
-  mutate(ns: ReturnType<typeof settingsNamespace>, ops: unknown[], expectedRevision?: number): Promise<void>
+  mutate(ns: string, ops: unknown[], expectedRevision?: number): Promise<void>
   writable?: boolean
 }
 
@@ -100,11 +100,11 @@ export function makeBridgeRoutes(
   search: SearchFn,
   testEngine: TestEngineFn,
 ): BridgeRoute[] {
-  const allowlisted = () =>
-    settings
-      .describe({ redactSecrets: true })
-      .filter((d) => String(d.ns) === FREE_SEARCH_NS)
-      .map((d) => String(d.ns))
+  // Preferred id first, so clients that take the first match pick it.
+  const allowlisted = () => {
+    const present = new Set(settings.describe({ redactSecrets: true }).map((d) => String(d.ns)))
+    return FREE_SEARCH_NAMESPACES.filter((ns) => present.has(ns))
+  }
 
   const guard = (req: IncomingMessage, res: ServerResponse): boolean => {
     if (!isLoopbackRequest(req)) {
@@ -144,7 +144,7 @@ export function makeBridgeRoutes(
       }
       const expectedRevision = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined
       try {
-        await settings.mutate(settingsNamespace(ns), body.ops as unknown[], expectedRevision)
+        await settings.mutate(ns, body.ops as unknown[], expectedRevision)
       } catch (error) {
         if (error instanceof SettingsConflictError) {
           return { ok: false, code: 'settings-conflict', message: error.message }
